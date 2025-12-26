@@ -110,7 +110,7 @@ def analyze_resume_with_gpt(resume_text, job_description, resume_keywords, jd_ke
 
         # Verify model is available
         try:
-            model = genai.GenerativeModel('gemini-1.5-pro-latest')
+            model = genai.GenerativeModel('gemini-1.5-pro')
         except Exception:
             # Fallback to standard model if latest not available
             model = genai.GenerativeModel('gemini-1.5-pro')
