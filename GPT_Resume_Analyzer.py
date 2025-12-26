@@ -144,7 +144,11 @@ Be critical but fair. The match score should reflect how well the resume matches
             response_format={"type": "json_object"}
         )
 
-        response_text = response.choices[0].message.content.strip()
+        response_text = response.choices[0].message.content
+        if not response_text:
+            st.error("Error: No content in API response")
+            return None
+        response_text = response_text.strip()
 
         # Parse JSON response
         analysis = json.loads(response_text)
