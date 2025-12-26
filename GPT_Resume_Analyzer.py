@@ -110,12 +110,9 @@ def analyze_resume_with_gpt(resume_text, job_description, resume_keywords, jd_ke
 
         # Model fallback chain for 2025
         models_to_try = [
-            'gemini-2.0-pro-exp',
+            'gemini-1.5-pro',
             'gemini-2.0-flash-exp',
-            'gemini-2.0-pro',
-            'gemini-2.5-pro',
             'gemini-1.5-flash',
-            'gemini-pro'
         ]
 
         model = None
