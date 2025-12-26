@@ -6,7 +6,7 @@ import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk import FreqDist
-from openai import OpenAI
+import google.generativeai as genai
 import ssl
 
 # Fix SSL certificate issues for NLTK data downloads on Streamlit Cloud
@@ -103,9 +103,10 @@ def create_score_bar(score):
     return f"{bar} {score}/100"
 
 def analyze_resume_with_gpt(resume_text, job_description, resume_keywords, jd_keywords, api_key):
-    """Use OpenAI GPT-4o-mini to analyze resume match with reliable JSON output"""
+    """Use Google Gemini 1.5 Flash to analyze resume match with reliable JSON output"""
 
-    client = OpenAI(api_key=api_key)
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-1.5-flash')
 
     prompt = f"""You are an expert resume analyst and recruiter. Analyze the following resume against the job description and provide a detailed analysis.
 
@@ -130,35 +131,36 @@ Please provide your analysis in the following JSON format:
     "summary": "Brief 2-3 sentence summary of the match"
 }}
 
-Be critical but fair. The match score should reflect how well the resume matches the job description."""
+IMPORTANT: Return ONLY valid JSON, no markdown or extra text. Be critical but fair. The match score should reflect how well the resume matches the job description."""
 
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a professional resume analyzer. Always return valid JSON only."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.7,
-            max_tokens=1000,
-            response_format={"type": "json_object"}
-        )
+        response = model.generate_content(prompt)
+        response_text = response.text
 
-        response_text = response.choices[0].message.content
         if not response_text:
             st.error("Error: No content in API response")
             return None
+
+        response_text = response_text.strip()
+
+        # Remove markdown code blocks if present
+        if response_text.startswith("```json"):
+            response_text = response_text[7:]
+        if response_text.startswith("```"):
+            response_text = response_text[3:]
+        if response_text.endswith("```"):
+            response_text = response_text[:-3]
         response_text = response_text.strip()
 
         # Parse JSON response
         analysis = json.loads(response_text)
         return analysis
 
-    except json.JSONDecodeError:
-        st.error("Error: Invalid JSON response from API. Please try again.")
+    except json.JSONDecodeError as e:
+        st.error(f"Error: Invalid JSON response from API. Please try again. (JSON Error: {str(e)})")
         return None
     except Exception as e:
-        st.error(f"Error calling OpenAI API: {str(e)}")
+        st.error(f"Error calling Gemini API: {str(e)}")
         return None
 
 def display_analysis_report(analysis):
@@ -227,8 +229,8 @@ def display_analysis_report(analysis):
         st.markdown(f"<div class='suggestion-box'>{i}. {suggestion}</div>", unsafe_allow_html=True)
 
 def main():
-    st.title("📄 Resume Analyzer with GPT-4o-mini")
-    st.markdown("Analyze your resume against job descriptions using AI-powered insights")
+    st.title("📄 Resume Analyzer with Google Gemini")
+    st.markdown("Analyze your resume against job descriptions using AI-powered insights (FREE with Gemini API)")
 
     # Sidebar for API Key - Production Ready
     with st.sidebar:
@@ -238,9 +240,9 @@ def main():
         api_key = None
 
         try:
-            api_key = st.secrets.get("OPENAI_API_KEY", None)
+            api_key = st.secrets.get("GEMINI_API_KEY", None)
             if api_key:
-                st.success("✅ Using production API key from secrets")
+                st.success("✅ Using production Gemini API key from secrets")
         except (AttributeError, KeyError):
             # st.secrets not available or key doesn't exist
             pass
@@ -252,14 +254,14 @@ def main():
             **For Local Testing:**
             1. Create `.streamlit/secrets.toml` in your project:
             ```
-            OPENAI_API_KEY = "your-api-key-here"
+            GEMINI_API_KEY = "your-api-key-here"
             ```
             2. Or paste key below (not recommended for production)
             """)
             manual_key = st.text_input(
-                "🔑 OpenAI API Key (for local testing)",
+                "🔑 Google Gemini API Key (for local testing)",
                 type="password",
-                help="Get your free API key from platform.openai.com/account/api-keys"
+                help="Get your FREE API key from ai.google.dev/tutorials/python_quickstart"
             )
             if manual_key:
                 api_key = manual_key
@@ -268,15 +270,20 @@ def main():
         # Validate API key exists
         if not api_key:
             st.error("""
-            ❌ **ERROR: OpenAI API Key Not Found**
+            ❌ **ERROR: Google Gemini API Key Not Found**
+
+            **Get FREE Access:**
+            1. Visit: https://ai.google.dev/tutorials/python_quickstart
+            2. Click "Get API Key"
+            3. Create new API key (FREE, 60 requests/minute)
 
             **Production Deployment:**
-            - Add OPENAI_API_KEY to Streamlit Secrets (https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app#secrets-management)
+            - Add GEMINI_API_KEY to Streamlit Secrets (https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app#secrets-management)
 
             **Local Testing:**
             - Create `.streamlit/secrets.toml`:
               ```
-              OPENAI_API_KEY = "sk-..."
+              GEMINI_API_KEY = "your-key-here"
               ```
             - Or paste your API key above
 
@@ -299,6 +306,7 @@ def main():
         - 🎯 Skill gap identification
         - 💡 Personalized recommendations
         - 🎨 Color-coded visualization
+        - 🆓 FREE with Google Gemini API (60 req/min)
         """)
 
     # Main Content
