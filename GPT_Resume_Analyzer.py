@@ -103,17 +103,36 @@ def create_score_bar(score):
     return f"{bar} {score}/100"
 
 def analyze_resume_with_gpt(resume_text, job_description, resume_keywords, jd_keywords, api_key):
-    """Use Google Gemini 1.5 Pro to analyze resume match with reliable JSON output"""
+    """Use Google Gemini 2.5 Pro to analyze resume match with reliable JSON output"""
 
     try:
         genai.configure(api_key=api_key)
 
-        # Verify model is available
-        try:
-            model = genai.GenerativeModel('gemini-1.5-pro')
-        except Exception:
-            # Fallback to standard model if latest not available
-            model = genai.GenerativeModel('gemini-1.5-pro')
+        # Model fallback chain for 2025
+        models_to_try = [
+            'gemini-2.0-pro-exp',
+            'gemini-2.0-flash-exp',
+            'gemini-2.0-pro',
+            'gemini-2.5-pro',
+            'gemini-1.5-flash',
+            'gemini-pro'
+        ]
+
+        model = None
+        used_model = None
+
+        for model_name in models_to_try:
+            try:
+                model = genai.GenerativeModel(model_name)
+                used_model = model_name
+                st.session_state.used_model = used_model
+                break
+            except Exception:
+                continue
+
+        if not model:
+            st.error("Error: No available Gemini models. Please check your API key.")
+            return None
 
         prompt = f"""You are an expert resume analyst and recruiter. Analyze the following resume against the job description and provide a detailed analysis.
 
@@ -244,6 +263,10 @@ def main():
 
         # Verify Gemini is loaded
         st.write("✅ Gemini API loaded")
+
+        # Show which model is being used
+        if "used_model" in st.session_state:
+            st.info(f"📊 Using model: **{st.session_state.used_model}**")
 
         # Try to get API key from st.secrets (production)
         api_key = None
