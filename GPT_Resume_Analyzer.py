@@ -110,9 +110,9 @@ def analyze_resume_with_gpt(resume_text, job_description, resume_keywords, jd_ke
 
         # Model fallback chain for 2025
         models_to_try = [
-            'gemini-1.5-pro',
-            'gemini-2.0-flash-exp',
-            'gemini-1.5-flash',
+            'models/gemini-1.5-pro',
+            'models/gemini-2.0-flash-exp',
+            'models/gemini-1.5-flash',
         ]
 
         model = None
@@ -120,7 +120,7 @@ def analyze_resume_with_gpt(resume_text, job_description, resume_keywords, jd_ke
 
         for model_name in models_to_try:
             try:
-                model = genai.GenerativeModel(model_name)
+                model = genai.GenerativeModel('models/gemini-1.5-pro')
                 used_model = model_name
                 st.session_state.used_model = used_model
                 break
