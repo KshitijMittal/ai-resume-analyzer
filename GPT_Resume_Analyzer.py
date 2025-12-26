@@ -1,5 +1,5 @@
 import streamlit as st
-import PyPDF2
+from pypdf import PdfReader
 import json
 from datetime import datetime
 import nltk
@@ -7,17 +7,26 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk import FreqDist
 from openai import OpenAI
+import ssl
+
+# Fix SSL certificate issues for NLTK data downloads on Streamlit Cloud
+try:
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    pass
+else:
+    ssl._create_default_https_context = _create_unverified_https_context
 
 # Download NLTK data
 try:
     nltk.data.find('tokenizers/punkt')
 except LookupError:
-    nltk.download('punkt')
+    nltk.download('punkt', quiet=True)
 
 try:
     nltk.data.find('corpora/stopwords')
 except LookupError:
-    nltk.download('stopwords')
+    nltk.download('stopwords', quiet=True)
 
 # Page Configuration
 st.set_page_config(
@@ -43,9 +52,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def extract_text_from_pdf(pdf_file):
-    """Extract text from PDF file"""
+    """Extract text from PDF file using pypdf for improved accuracy"""
     try:
-        pdf_reader = PyPDF2.PdfReader(pdf_file)
+        pdf_reader = PdfReader(pdf_file)
         text = ""
         for page in pdf_reader.pages:
             text += page.extract_text() + "\n"
@@ -94,7 +103,7 @@ def create_score_bar(score):
     return f"{bar} {score}/100"
 
 def analyze_resume_with_gpt(resume_text, job_description, resume_keywords, jd_keywords, api_key):
-    """Use OpenAI GPT-4o-mini to analyze resume match"""
+    """Use OpenAI GPT-4o-mini to analyze resume match with reliable JSON output"""
 
     client = OpenAI(api_key=api_key)
 
@@ -109,7 +118,7 @@ JOB DESCRIPTION:
 RESUME KEYWORDS EXTRACTED: {', '.join(resume_keywords)}
 JOB DESCRIPTION KEYWORDS: {', '.join(jd_keywords)}
 
-Please provide your analysis in the following JSON format (IMPORTANT: Return ONLY valid JSON, no markdown):
+Please provide your analysis in the following JSON format:
 {{
     "match_score": <0-100>,
     "skills_match": <0-100>,
@@ -131,7 +140,8 @@ Be critical but fair. The match score should reflect how well the resume matches
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,
-            max_tokens=1000
+            max_tokens=1000,
+            response_format={"type": "json_object"}
         )
 
         response_text = response.choices[0].message.content.strip()
@@ -140,6 +150,9 @@ Be critical but fair. The match score should reflect how well the resume matches
         analysis = json.loads(response_text)
         return analysis
 
+    except json.JSONDecodeError:
+        st.error("Error: Invalid JSON response from API. Please try again.")
+        return None
     except Exception as e:
         st.error(f"Error calling OpenAI API: {str(e)}")
         return None
@@ -352,12 +365,25 @@ def main():
 
     # Analysis Button
     if st.button("🚀 Analyze Resume", type="primary", use_container_width=True):
+        # Input validation
+        validation_errors = []
+
         if not api_key:
-            st.error("❌ API Key Error: Please enter your OpenAI API key in the sidebar (left side)")
-        elif not resume_text or len(resume_text) < 50:
-            st.error("❌ Please provide a resume (at least 50 characters)")
-        elif not job_description or len(job_description) < 50:
-            st.error("❌ Please provide a job description (at least 50 characters)")
+            validation_errors.append("API Key Error: Please enter your OpenAI API key in the sidebar (left side)")
+
+        if not resume_text or not resume_text.strip():
+            validation_errors.append("Please provide a resume (paste text or upload a file)")
+        elif len(resume_text.strip()) < 50:
+            validation_errors.append("Resume is too short (at least 50 characters required)")
+
+        if not job_description or not job_description.strip():
+            validation_errors.append("Please provide a job description (paste text or upload a file)")
+        elif len(job_description.strip()) < 50:
+            validation_errors.append("Job description is too short (at least 50 characters required)")
+
+        if validation_errors:
+            for error in validation_errors:
+                st.error(f"❌ {error}")
         else:
             with st.spinner("🔄 Analyzing resume... This may take a few seconds"):
                 # Extract keywords
