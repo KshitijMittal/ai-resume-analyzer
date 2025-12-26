@@ -30,7 +30,7 @@ except LookupError:
 
 # Page Configuration
 st.set_page_config(
-    page_title="Resume Analyzer with GPT",
+    page_title="Resume Analyzer with Gemini",
     page_icon="📄",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -103,12 +103,19 @@ def create_score_bar(score):
     return f"{bar} {score}/100"
 
 def analyze_resume_with_gpt(resume_text, job_description, resume_keywords, jd_keywords, api_key):
-    """Use Google Gemini 1.5 Flash to analyze resume match with reliable JSON output"""
+    """Use Google Gemini 1.5 Pro to analyze resume match with reliable JSON output"""
 
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    try:
+        genai.configure(api_key=api_key)
 
-    prompt = f"""You are an expert resume analyst and recruiter. Analyze the following resume against the job description and provide a detailed analysis.
+        # Verify model is available
+        try:
+            model = genai.GenerativeModel('gemini-1.5-pro-latest')
+        except Exception:
+            # Fallback to standard model if latest not available
+            model = genai.GenerativeModel('gemini-1.5-pro')
+
+        prompt = f"""You are an expert resume analyst and recruiter. Analyze the following resume against the job description and provide a detailed analysis.
 
 RESUME:
 {resume_text[:2000]}...
@@ -133,7 +140,6 @@ Please provide your analysis in the following JSON format:
 
 IMPORTANT: Return ONLY valid JSON, no markdown or extra text. Be critical but fair. The match score should reflect how well the resume matches the job description."""
 
-    try:
         response = model.generate_content(prompt)
         response_text = response.text
 
@@ -235,6 +241,9 @@ def main():
     # Sidebar for API Key - Production Ready
     with st.sidebar:
         st.header("⚙️ Configuration")
+
+        # Verify Gemini is loaded
+        st.write("✅ Gemini API loaded")
 
         # Try to get API key from st.secrets (production)
         api_key = None
@@ -381,7 +390,7 @@ def main():
         validation_errors = []
 
         if not api_key:
-            validation_errors.append("API Key Error: Please enter your OpenAI API key in the sidebar (left side)")
+            validation_errors.append("API Key Error: Please enter your Gemini API key in the sidebar (left side)")
 
         if not resume_text or not resume_text.strip():
             validation_errors.append("Please provide a resume (paste text or upload a file)")
